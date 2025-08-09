@@ -1,0 +1,262 @@
+<div id="container" style="text-align:center; font-family:'Segoe UI', sans-serif; padding:20px;">
+  <h2 style="color:#2c3e50;">Rubik's Cube Timer</h2>
+
+  <!-- Theme Toggle -->
+  <button onclick="toggleTheme()" style="margin-bottom:10px; padding:6px 12px; font-size:14px; background:#7f8c8d; color:white; border:none; border-radius:5px;">Toggle Dark Mode</button>
+
+  <!-- Scramble Type -->
+  <div style="margin:10px 0;">
+    <label for="scrambleType">Scramble Type:</label>
+    <select id="scrambleType" onchange="updateScramble()" style="padding:4px 8px;">
+      <option value="3">3x3</option>
+      <option value="2">2x2</option>
+      <option value="4">4x4</option>
+    </select>
+  </div>
+
+  <!-- Inspection Toggle -->
+  <div style="margin:10px 0;">
+    <label><input type="checkbox" id="useInspection" checked> Use Inspection</label>
+  </div>
+
+  <!-- Scramble Display -->
+  <div id="scramble" style="font-size:20px; margin:10px 0; color:#34495e;"></div>
+  <button onclick="updateScramble()" style="padding:8px 16px; font-size:14px; background:#f39c12; color:white; border:none; border-radius:5px;">Rescramble</button>
+
+  <!-- Inspection Timer -->
+  <div id="inspection" style="font-size:18px; margin:10px 0; color:#e67e22;"></div>
+
+  <!-- Timer -->
+  <div id="timer" style="font-size:48px; color:#e74c3c; margin:20px 0;">00:00.00</div>
+  <button id="startStopBtn" onclick="handleStartStop()" style="padding:10px 20px; font-size:16px; background:#3498db; color:white; border:none; border-radius:5px;">Start</button>
+  <button onclick="resetTimer()" style="padding:10px 20px; font-size:16px; background:#95a5a6; color:white; border:none; border-radius:5px; margin-left:10px;">Reset</button>
+
+  <!-- Stats -->
+  <h3 style="margin-top:30px; color:#2c3e50;">Stats</h3>
+  <div id="stats" style="font-size:16px; color:#2c3e50;"></div>
+
+  <!-- Export -->
+  <button onclick="exportCSV()" style="margin-top:10px; padding:8px 16px; font-size:14px; background:#27ae60; color:white; border:none; border-radius:5px;">Export to CSV</button>
+
+  <!-- Saved Times -->
+  <h3 style="margin-top:30px; color:#2c3e50;">Saved Times</h3>
+  <ul id="timeList" style="list-style:none; padding:0;"></ul>
+  <button onclick="clearAll()" style="margin-top:10px; padding:8px 16px; font-size:14px; background:#e74c3c; color:white; border:none; border-radius:5px;">Clear All</button>
+</div>
+
+<script>
+  let startTime, updatedTime, difference, timerInterval, inspectionInterval;
+  let running = false;
+  let currentTime = null;
+  let inspectionTime = 15;
+
+  const moves3 = ["R", "R'", "R2", "L", "L'", "L2", "U", "U'", "U2", "D", "D'", "D2", "F", "F'", "F2", "B", "B'", "B2"];
+  const moves2 = ["R", "R'", "U", "U'", "F", "F'"];
+  const moves4 = moves3.concat(["Rw", "Rw'", "Uw", "Uw'", "Fw", "Fw'"]);
+
+  function getMoves() {
+    const type = document.getElementById("scrambleType").value;
+    return type === "2" ? moves2 : type === "4" ? moves4 : moves3;
+  }
+
+  function generateScramble(length = 20) {
+    let scramble = [];
+    let lastMove = "";
+    const moves = getMoves();
+    while (scramble.length < length) {
+      let move = moves[Math.floor(Math.random() * moves.length)];
+      if (move[0] !== lastMove[0]) {
+        scramble.push(move);
+        lastMove = move;
+      }
+    }
+    return scramble.join(" ");
+  }
+
+  function updateScramble() {
+    document.getElementById("scramble").innerText = "Scramble: " + generateScramble();
+  }
+
+  function handleStartStop() {
+    if (!running) {
+      const useInspection = document.getElementById("useInspection").checked;
+      if (useInspection) {
+        startInspection();
+      } else {
+        startTimer();
+      }
+      document.getElementById("startStopBtn").innerText = "Stop";
+    } else {
+      stopTimer();
+      document.getElementById("startStopBtn").innerText = "Start";
+    }
+  }
+
+  function startInspection() {
+    inspectionTime = 15;
+    document.getElementById("inspection").innerText = "Inspection: 15s";
+    inspectionInterval = setInterval(() => {
+      inspectionTime--;
+      document.getElementById("inspection").innerText = "Inspection: " + inspectionTime + "s";
+      if (inspectionTime <= 0) {
+        clearInterval(inspectionInterval);
+        document.getElementById("inspection").innerText = "";
+        startTimer();
+      }
+    }, 1000);
+  }
+
+  function startTimer() {
+    startTime = new Date().getTime();
+    timerInterval = setInterval(() => {
+      updatedTime = new Date().getTime();
+      difference = updatedTime - startTime;
+      updateDisplay(difference);
+    }, 10);
+    running = true;
+  }
+
+  function stopTimer() {
+    clearInterval(timerInterval);
+    running = false;
+    currentTime = difference;
+    autoSaveTime();
+    updateScramble();
+  }
+
+  function updateDisplay(diff) {
+    let minutes = Math.floor(diff / 60000);
+    let seconds = Math.floor((diff % 60000) / 1000);
+    let milliseconds = Math.floor((diff % 1000) / 10);
+    document.getElementById("timer").innerText =
+      (minutes < 10 ? "0" : "") + minutes + ":" +
+      (seconds < 10 ? "0" : "") + seconds + "." +
+      (milliseconds < 10 ? "0" : "") + milliseconds;
+  }
+
+  function resetTimer() {
+    clearInterval(timerInterval);
+    clearInterval(inspectionInterval);
+    running = false;
+    difference = 0;
+    currentTime = null;
+    document.getElementById("timer").innerText = "00:00.00";
+    document.getElementById("inspection").innerText = "";
+    document.getElementById("startStopBtn").innerText = "Start";
+    updateScramble();
+  }
+
+  function formatTime(ms) {
+    if (ms === "DNF") return "DNF";
+    let minutes = Math.floor(ms / 60000);
+    let seconds = Math.floor((ms % 60000) / 1000);
+    let milliseconds = Math.floor((ms % 1000) / 10);
+    return (minutes < 10 ? "0" : "") + minutes + ":" +
+           (seconds < 10 ? "0" : "") + seconds + "." +
+           (milliseconds < 10 ? "0" : "") + milliseconds;
+  }
+
+  function autoSaveTime() {
+    let times = JSON.parse(localStorage.getItem("cubeTimes")) || [];
+    times.push(difference);
+    localStorage.setItem("cubeTimes", JSON.stringify(times));
+    renderTimes();
+  }
+
+  function renderTimes() {
+    let times = JSON.parse(localStorage.getItem("cubeTimes")) || [];
+    let list = document.getElementById("timeList");
+    list.innerHTML = "";
+    times.forEach((time, index) => {
+      let li = document.createElement("li");
+      li.style.margin = "5px 0";
+      li.innerHTML = `<span style="font-size:18px;">${formatTime(time)}</span> 
+        <button onclick="deleteTime(${index})" style="margin-left:10px; padding:4px 8px; font-size:12px; background:#c0392b; color:white; border:none; border-radius:3px;">Delete</button>
+        <button onclick="markDNF(${index})" style="margin-left:5px; padding:4px 8px; font-size:12px; background:#7f8c8d; color:white; border:none; border:none; border-radius:3px;">DNF</button>`;
+      list.appendChild(li);
+    });
+    updateStats(times);
+  }
+
+  function deleteTime(index) {
+    let times = JSON.parse(localStorage.getItem("cubeTimes")) || [];
+    times.splice(index, 1);
+    localStorage.setItem("cubeTimes", JSON.stringify(times));
+    renderTimes();
+  }
+
+  function markDNF(index) {
+    let times = JSON.parse(localStorage.getItem("cubeTimes")) || [];
+    times[index] = "DNF";
+    localStorage.setItem("cubeTimes", JSON.stringify(times));
+    renderTimes();
+  }
+
+  function clearAll() {
+    localStorage.removeItem("cubeTimes");
+    renderTimes();
+  }
+
+  function updateStats(times) {
+    let validTimes = times.filter(t => t !== "DNF");
+    let stats = "";
+
+    if (validTimes.length > 0) {
+      let best = Math.min(...validTimes);
+      let mean = validTimes.reduce((a, b) => a + b, 0) / validTimes.length;
+      stats += `Current: ${formatTime(difference)}<br>`;
+      stats += `Best: ${formatTime(best)}<br>`;
+      stats += `Mean: ${formatTime(mean)}<br>`;
+    }
+
+    function averageOf(n) {
+      let recent = validTimes.slice(-n);
+      if (recent.length < n) return "—";
+      let avg = recent.reduce((a, b) => a + b, 0) / n;
+      return formatTime(avg);
+    }
+
+    stats += `Ao5: ${averageOf(5)}<br>`;
+    stats += `Ao12: ${averageOf(12)}<br>`;
+
+    document.getElementById("stats").innerHTML = stats;
+  }
+
+  function exportCSV() {
+    let times = JSON.parse(localStorage.getItem("cubeTimes")) || [];
+    let csv = "Time\n";
+    times.forEach(t => {
+      csv += formatTime(t) + "\n";
+    });
+    let blob = new Blob([csv], { type: "text/csv" });
+    let link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "cube_times.csv";
+    link.click();
+  }
+
+  function toggleTheme() {
+    const body = document.body;
+    body.classList.toggle("dark-mode");
+  }
+
+  // Optional: Dark mode styling
+  const style = document.createElement("style");
+  style.innerHTML = `
+    .dark-mode {
+      background-color: #1e1e1e;
+      color: #ecf0f1;
+    }
+    .dark-mode button {
+      background-color: #34495e !important;
+      color: #ecf0f1 !important;
+    }
+  `;
+  document.head.appendChild(style);
+
+  // Initialize
+  window.onload = () => {
+    renderTimes();
+    updateScramble();
+  };
+</script>
